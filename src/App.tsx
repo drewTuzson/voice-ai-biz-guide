@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AssessmentProvider } from "@/contexts/AssessmentContext";
 import { ProtectedRoute } from "@/components/Auth/ProtectedRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -11,6 +12,7 @@ import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import Assessment from "./pages/Assessment";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +39,8 @@ function AppRoutes() {
       {/* Protected routes */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/assessment" element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
+      <Route path="/assessment/:id" element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
       
       {/* Catch all route */}
       <Route path="*" element={<NotFound />} />
@@ -51,7 +55,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <AssessmentProvider>
+            <AppRoutes />
+          </AssessmentProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

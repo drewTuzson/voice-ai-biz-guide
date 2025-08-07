@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { AppLayout } from '@/components/Layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Clock, CheckCircle, FileText } from 'lucide-react'
+import { Plus, Clock, CheckCircle, FileText, Mic } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from '@/hooks/use-toast'
 
@@ -16,6 +17,7 @@ interface Profile {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -91,19 +93,24 @@ export default function Dashboard() {
           <Card className="border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                <Plus className="h-6 w-6 text-primary" />
+                <Mic className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle>Start New Assessment</CardTitle>
+              <CardTitle>Voice Assessment</CardTitle>
               <CardDescription>
-                Tell us about your business and discover AI opportunities
+                Have a 5-minute conversation with Alex about your business
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-              <Button className="w-full" size="lg">
-                Begin Assessment
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={() => navigate('/assessment')}
+              >
+                <Mic className="mr-2 h-4 w-4" />
+                Start Voice Assessment
               </Button>
               <p className="text-xs text-muted-foreground text-center mt-2">
-                5-10 minute conversation
+                Speak naturally or type your responses
               </p>
             </CardContent>
           </Card>
