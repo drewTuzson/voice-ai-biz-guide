@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      assessment_responses: {
+        Row: {
+          assessment_id: string | null
+          created_at: string | null
+          id: string
+          question_id: string
+          response_audio_url: string | null
+          response_text: string | null
+          response_type: string | null
+        }
+        Insert: {
+          assessment_id?: string | null
+          created_at?: string | null
+          id?: string
+          question_id: string
+          response_audio_url?: string | null
+          response_text?: string | null
+          response_type?: string | null
+        }
+        Update: {
+          assessment_id?: string | null
+          created_at?: string | null
+          id?: string
+          question_id?: string
+          response_audio_url?: string | null
+          response_text?: string | null
+          response_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_responses_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessments: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          current_question: number | null
+          id: string
+          responses: Json | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          current_question?: number | null
+          id?: string
+          responses?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          current_question?: number | null
+          id?: string
+          responses?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           business_name: string | null
