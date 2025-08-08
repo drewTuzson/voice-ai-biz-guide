@@ -5,18 +5,11 @@ export interface AssessmentQuestion {
   category: string;
 }
 
-const ALEX_INTRODUCTION = `
-Hi! I'm Alex, your AI business strategist. I'm here to help you discover 
-how AI can transform your business operations and save you time.
+const ALEX_INTRODUCTION = `Hi! I'm Alex, your AI business strategist. I'm here to help you discover how AI can transform your business operations and save you time.
 
-Over the next few minutes, I'll ask you about your business, understand 
-your challenges, and identify specific AI solutions that could help you 
-grow. At the end, you'll receive a personalized report with practical 
-recommendations and ROI estimates.
+Over the next few minutes, I'll ask you about your business, understand your challenges, and identify specific AI solutions that could help you grow. At the end, you'll receive a personalized report with practical recommendations and ROI estimates.
 
-Let's start with getting to know your business. Tell me, what do you do 
-and who are your customers?
-`;
+Let's start with getting to know your business. Tell me, what do you do and who are your customers?`;
 
 export const assessmentQuestions: AssessmentQuestion[] = [
   {

@@ -1,116 +1,85 @@
-interface TextToSpeechOptions {
-  voice?: SpeechSynthesisVoice | null;
-  rate?: number;
-  pitch?: number;
-  volume?: number;
+import { supabase } from '@/integrations/supabase/client';
+
+interface SpeakOptions {
+  voice?: 'onyx' | 'alloy' | 'echo' | 'fable' | 'nova' | 'shimmer';
+  speed?: number;
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: (error: Error) => void;
 }
 
-export class TextToSpeechManager {
-  private synth: SpeechSynthesis;
-  private currentUtterance: SpeechSynthesisUtterance | null = null;
-  private onSpeakingChange?: (speaking: boolean) => void;
+class AlexVoice {
+  private currentAudio: HTMLAudioElement | null = null;
+  private audioCache: Map<string, string> = new Map();
+  
+  async speak(text: string, options: SpeakOptions = {}) {
+    const {
+      voice = 'onyx',
+      speed = 0.95,
+      onStart,
+      onEnd,
+      onError
+    } = options;
 
-  constructor(onSpeakingChange?: (speaking: boolean) => void) {
-    this.synth = window.speechSynthesis;
-    this.onSpeakingChange = onSpeakingChange;
-  }
-
-  static isSupported(): boolean {
-    return 'speechSynthesis' in window;
-  }
-
-  getVoices(): SpeechSynthesisVoice[] {
-    return this.synth.getVoices();
-  }
-
-  // Get a professional male voice, fallback to default
-  getPreferredVoice(): SpeechSynthesisVoice | null {
-    const voices = this.getVoices();
-    
-    // Look for professional male voices
-    const maleVoices = voices.filter(voice => 
-      voice.name.toLowerCase().includes('male') ||
-      voice.name.toLowerCase().includes('david') ||
-      voice.name.toLowerCase().includes('alex') ||
-      voice.name.toLowerCase().includes('daniel')
-    );
-
-    if (maleVoices.length > 0) {
-      return maleVoices[0];
-    }
-
-    // Fallback to default English voice
-    const englishVoices = voices.filter(voice => 
-      voice.lang.startsWith('en-')
-    );
-
-    return englishVoices.length > 0 ? englishVoices[0] : null;
-  }
-
-  speak(text: string, options: TextToSpeechOptions = {}): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!TextToSpeechManager.isSupported()) {
-        reject(new Error('Text-to-speech not supported'));
-        return;
-      }
-
-      // Stop any current speech
+    try {
       this.stop();
-
-      const utterance = new SpeechSynthesisUtterance(text);
       
-      // Set voice
-      utterance.voice = options.voice || this.getPreferredVoice();
-      utterance.rate = options.rate || 0.9; // Slightly slower for clarity
-      utterance.pitch = options.pitch || 1;
-      utterance.volume = options.volume || 1;
-
-      utterance.onstart = () => {
-        this.onSpeakingChange?.(true);
+      const cacheKey = `${text}-${voice}-${speed}`;
+      let audioUrl = this.audioCache.get(cacheKey);
+      
+      if (!audioUrl) {
+        onStart?.();
+        
+        const { data, error } = await supabase.functions.invoke('openai-tts', {
+          body: { text, voice, speed }
+        });
+        
+        if (error) throw error;
+        
+        audioUrl = URL.createObjectURL(new Blob([data], { type: 'audio/mpeg' }));
+        this.audioCache.set(cacheKey, audioUrl);
+      }
+      
+      this.currentAudio = new Audio(audioUrl);
+      
+      this.currentAudio.onended = () => {
+        this.currentAudio = null;
+        onEnd?.();
       };
-
-      utterance.onend = () => {
-        this.onSpeakingChange?.(false);
-        this.currentUtterance = null;
-        resolve();
+      
+      this.currentAudio.onerror = (e) => {
+        onError?.(new Error('Audio playback failed'));
       };
-
-      utterance.onerror = (event) => {
-        this.onSpeakingChange?.(false);
-        this.currentUtterance = null;
-        reject(new Error(`Speech synthesis error: ${event.error}`));
-      };
-
-      this.currentUtterance = utterance;
-      this.synth.speak(utterance);
-    });
-  }
-
-  stop(): void {
-    if (this.synth.speaking) {
-      this.synth.cancel();
-    }
-    this.onSpeakingChange?.(false);
-    this.currentUtterance = null;
-  }
-
-  pause(): void {
-    if (this.synth.speaking && !this.synth.paused) {
-      this.synth.pause();
+      
+      await this.currentAudio.play();
+      
+    } catch (error) {
+      console.error('TTS Error:', error);
+      onError?.(error as Error);
+      this.fallbackSpeak(text, onEnd);
     }
   }
-
-  resume(): void {
-    if (this.synth.paused) {
-      this.synth.resume();
+  
+  stop() {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
     }
   }
-
-  isSpeaking(): boolean {
-    return this.synth.speaking;
+  
+  private fallbackSpeak(text: string, onEnd?: () => void) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 0.95;
+    utterance.onend = () => onEnd?.();
+    speechSynthesis.speak(utterance);
   }
-
-  isPaused(): boolean {
-    return this.synth.paused;
+  
+  async preloadPhrases(phrases: string[]) {
+    for (const phrase of phrases) {
+      await this.speak(phrase, { onStart: () => {}, onEnd: () => {} });
+    }
   }
 }
+
+export const alexVoice = new AlexVoice();

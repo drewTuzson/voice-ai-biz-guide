@@ -8,8 +8,9 @@ import { VoiceRecorder } from '@/components/Voice/VoiceRecorder';
 import { TranscriptionDisplay } from '@/components/Voice/TranscriptionDisplay';
 import { ResponseDisplay } from '@/components/Assessment/ResponseDisplay';
 import { VoiceSettings } from '@/components/Assessment/VoiceSettings';
+import { AlexMessage } from '@/components/Assessment/AlexMessage';
 import { useAssessment } from '@/contexts/AssessmentContext';
-import { TextToSpeechManager } from '@/utils/textToSpeech';
+import { alexVoice } from '@/utils/textToSpeech';
 import { ChevronLeft, ChevronRight, SkipForward, CheckCircle, Volume2, VolumeX, RotateCcw, Settings, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,7 +44,7 @@ export default function Assessment() {
   const [hasRecordedAudio, setHasRecordedAudio] = useState(false);
   const [isAlexSpeaking, setIsAlexSpeaking] = useState(false);
   const [alexMuted, setAlexMuted] = useState(false);
-  const [ttsManager] = useState(() => new TextToSpeechManager(setIsAlexSpeaking));
+  
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showSettings, setShowSettings] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState({
@@ -62,6 +63,15 @@ export default function Assessment() {
     }
   }, [id, loadAssessment, startNewAssessment]);
 
+  // Preload common phrases on mount
+  useEffect(() => {
+    alexVoice.preloadPhrases([
+      "Great answer! Let me ask you more about that.",
+      "Interesting! Tell me more.", 
+      "Thank you for sharing that.",
+    ]);
+  }, []);
+
   // Load existing response for current question
   useEffect(() => {
     if (currentQuestion) {
@@ -76,16 +86,8 @@ export default function Assessment() {
       setHasRecordedAudio(false);
       setSaveStatus('idle');
       
-      // Speak question if Alex voice is enabled
-      if (voiceSettings.alexVoiceEnabled && !alexMuted && TextToSpeechManager.isSupported()) {
-        setTimeout(() => {
-          ttsManager.speak(currentQuestion.text, { 
-            rate: voiceSettings.speakingSpeed 
-          }).catch(console.error);
-        }, 500); // Small delay for better UX
-      }
     }
-  }, [currentQuestion, responses, voiceSettings.alexVoiceEnabled, voiceSettings.speakingSpeed, alexMuted, ttsManager]);
+  }, [currentQuestion, responses]);
 
   const handleTranscription = (text: string, isFinal: boolean) => {
     setTranscription(text);
@@ -143,18 +145,10 @@ export default function Assessment() {
     setSaveStatus('idle');
   };
 
-  const replayQuestion = () => {
-    if (currentQuestion && voiceSettings.alexVoiceEnabled && TextToSpeechManager.isSupported()) {
-      ttsManager.speak(currentQuestion.text, { 
-        rate: voiceSettings.speakingSpeed 
-      }).catch(console.error);
-    }
-  };
-
   const toggleAlexMute = () => {
     setAlexMuted(!alexMuted);
     if (!alexMuted) {
-      ttsManager.stop();
+      alexVoice.stop();
     }
   };
 
@@ -247,59 +241,14 @@ export default function Assessment() {
         <Progress value={progress} className="w-full" />
       </div>
 
-      {/* AI Assistant Introduction */}
-      <Card className="mb-8 p-6 bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
-            A
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground mb-1">
-              Hi, I'm Alex, your AI business strategist
-            </h3>
-            <p className="text-muted-foreground text-sm">
-              I'll guide you through this assessment to understand your business better. 
-              You can speak your answers or type them - whatever feels more comfortable.
-            </p>
-          </div>
-        </div>
-      </Card>
+      {/* Current Question with Alex */}
+      <AlexMessage 
+        message={currentQuestion.text}
+        autoPlay={voiceSettings.alexVoiceEnabled && !alexMuted}
+      />
 
-      {/* Current Question */}
+      {/* Response Section */}
       <Card className="mb-8 p-8">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant={alexMuted ? "outline" : "ghost"}
-              size="sm"
-              onClick={toggleAlexMute}
-              className="h-8 px-2"
-            >
-              {alexMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </Button>
-            {isAlexSpeaking && (
-              <div className="flex items-center gap-2 text-accent">
-                <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-                <span className="text-sm">Alex is speaking...</span>
-              </div>
-            )}
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={replayQuestion}
-            disabled={isAlexSpeaking}
-            className="h-8"
-          >
-            <Play size={14} className="mr-1" />
-            Replay
-          </Button>
-        </div>
-
-        <h2 className="text-xl font-semibold text-foreground mb-2 whitespace-pre-line">
-          {currentQuestion.text}
-        </h2>
         {currentQuestion.helpText && (
           <p className="text-muted-foreground text-sm mb-6">
             💡 {currentQuestion.helpText}
