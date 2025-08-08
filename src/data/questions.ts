@@ -5,10 +5,23 @@ export interface AssessmentQuestion {
   category: string;
 }
 
+const ALEX_INTRODUCTION = `
+Hi! I'm Alex, your AI business strategist. I'm here to help you discover 
+how AI can transform your business operations and save you time.
+
+Over the next few minutes, I'll ask you about your business, understand 
+your challenges, and identify specific AI solutions that could help you 
+grow. At the end, you'll receive a personalized report with practical 
+recommendations and ROI estimates.
+
+Let's start with getting to know your business. Tell me, what do you do 
+and who are your customers?
+`;
+
 export const assessmentQuestions: AssessmentQuestion[] = [
   {
     id: 'business-context',
-    text: 'Tell me about your business. What do you do, and who are your customers?',
+    text: ALEX_INTRODUCTION,
     helpText: 'This helps me understand your industry and core business model',
     category: 'business-overview'
   },

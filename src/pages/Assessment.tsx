@@ -6,8 +6,11 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { VoiceRecorder } from '@/components/Voice/VoiceRecorder';
 import { TranscriptionDisplay } from '@/components/Voice/TranscriptionDisplay';
+import { ResponseDisplay } from '@/components/Assessment/ResponseDisplay';
+import { VoiceSettings } from '@/components/Assessment/VoiceSettings';
 import { useAssessment } from '@/contexts/AssessmentContext';
-import { ChevronLeft, ChevronRight, SkipForward, CheckCircle } from 'lucide-react';
+import { TextToSpeechManager } from '@/utils/textToSpeech';
+import { ChevronLeft, ChevronRight, SkipForward, CheckCircle, Volume2, VolumeX, RotateCcw, Settings, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Assessment() {
@@ -38,6 +41,17 @@ export default function Assessment() {
   const [transcription, setTranscription] = useState('');
   const [useTextMode, setUseTextMode] = useState(false);
   const [hasRecordedAudio, setHasRecordedAudio] = useState(false);
+  const [isAlexSpeaking, setIsAlexSpeaking] = useState(false);
+  const [alexMuted, setAlexMuted] = useState(false);
+  const [ttsManager] = useState(() => new TextToSpeechManager(setIsAlexSpeaking));
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [showSettings, setShowSettings] = useState(false);
+  const [voiceSettings, setVoiceSettings] = useState({
+    alexVoiceEnabled: true,
+    speakingSpeed: 0.9,
+    autoAdvance: false,
+    showTranscriptionWhileRecording: true
+  });
 
   // Load assessment or start new one
   useEffect(() => {
@@ -60,8 +74,18 @@ export default function Assessment() {
         setTranscription('');
       }
       setHasRecordedAudio(false);
+      setSaveStatus('idle');
+      
+      // Speak question if Alex voice is enabled
+      if (voiceSettings.alexVoiceEnabled && !alexMuted && TextToSpeechManager.isSupported()) {
+        setTimeout(() => {
+          ttsManager.speak(currentQuestion.text, { 
+            rate: voiceSettings.speakingSpeed 
+          }).catch(console.error);
+        }, 500); // Small delay for better UX
+      }
     }
-  }, [currentQuestion, responses]);
+  }, [currentQuestion, responses, voiceSettings.alexVoiceEnabled, voiceSettings.speakingSpeed, alexMuted, ttsManager]);
 
   const handleTranscription = (text: string, isFinal: boolean) => {
     setTranscription(text);
@@ -78,16 +102,74 @@ export default function Assessment() {
     }
   };
 
-  const handleTextResponse = () => {
+  const handleTextResponse = async () => {
     if (currentQuestion && currentResponse.trim()) {
-      saveResponse(currentQuestion.id, currentResponse);
+      setSaveStatus('saving');
+      try {
+        await saveResponse(currentQuestion.id, currentResponse);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+        
+        if (voiceSettings.autoAdvance) {
+          setTimeout(() => handleNext(), 1500);
+        }
+      } catch (error) {
+        setSaveStatus('idle');
+        console.error('Failed to save response:', error);
+      }
+    }
+  };
+
+  const handleResponseEdit = async (newText: string) => {
+    if (currentQuestion) {
+      setSaveStatus('saving');
+      try {
+        await saveResponse(currentQuestion.id, newText);
+        setCurrentResponse(newText);
+        setTranscription(newText);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } catch (error) {
+        setSaveStatus('idle');
+        console.error('Failed to update response:', error);
+      }
+    }
+  };
+
+  const handleResponseClear = () => {
+    setCurrentResponse('');
+    setTranscription('');
+    setHasRecordedAudio(false);
+    setSaveStatus('idle');
+  };
+
+  const replayQuestion = () => {
+    if (currentQuestion && voiceSettings.alexVoiceEnabled && TextToSpeechManager.isSupported()) {
+      ttsManager.speak(currentQuestion.text, { 
+        rate: voiceSettings.speakingSpeed 
+      }).catch(console.error);
+    }
+  };
+
+  const toggleAlexMute = () => {
+    setAlexMuted(!alexMuted);
+    if (!alexMuted) {
+      ttsManager.stop();
     }
   };
 
   const handleNext = async () => {
     // Save current response if there's text and no audio recorded
-    if (currentQuestion && currentResponse.trim() && !hasRecordedAudio) {
-      await saveResponse(currentQuestion.id, currentResponse);
+    if (currentQuestion && currentResponse.trim() && !hasRecordedAudio && saveStatus !== 'saved') {
+      setSaveStatus('saving');
+      try {
+        await saveResponse(currentQuestion.id, currentResponse);
+        setSaveStatus('saved');
+      } catch (error) {
+        setSaveStatus('idle');
+        console.error('Failed to save response:', error);
+        return;
+      }
     }
 
     if (canGoNext) {
@@ -146,9 +228,19 @@ export default function Assessment() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-foreground">Business Assessment</h1>
-          <span className="text-sm text-muted-foreground">
-            Question {currentQuestionIndex + 1} of 5
-          </span>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+              className="h-8 px-2"
+            >
+              <Settings size={16} />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Question {currentQuestionIndex + 1} of 5
+            </span>
+          </div>
         </div>
         
         {/* Progress Bar */}
@@ -175,13 +267,58 @@ export default function Assessment() {
 
       {/* Current Question */}
       <Card className="mb-8 p-8">
-        <h2 className="text-xl font-semibold text-foreground mb-2">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant={alexMuted ? "outline" : "ghost"}
+              size="sm"
+              onClick={toggleAlexMute}
+              className="h-8 px-2"
+            >
+              {alexMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </Button>
+            {isAlexSpeaking && (
+              <div className="flex items-center gap-2 text-accent">
+                <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+                <span className="text-sm">Alex is speaking...</span>
+              </div>
+            )}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={replayQuestion}
+            disabled={isAlexSpeaking}
+            className="h-8"
+          >
+            <Play size={14} className="mr-1" />
+            Replay
+          </Button>
+        </div>
+
+        <h2 className="text-xl font-semibold text-foreground mb-2 whitespace-pre-line">
           {currentQuestion.text}
         </h2>
         {currentQuestion.helpText && (
           <p className="text-muted-foreground text-sm mb-6">
             💡 {currentQuestion.helpText}
           </p>
+        )}
+
+        {/* Current Response Display */}
+        {(currentResponse || transcription) && (
+          <div className="mb-6">
+            <ResponseDisplay
+              response={{
+                text: currentResponse || transcription,
+                type: hasRecordedAudio ? 'voice' : 'text',
+                timestamp: new Date().toISOString()
+              }}
+              onEdit={handleResponseEdit}
+              onClear={handleResponseClear}
+            />
+          </div>
         )}
 
         {/* Response Options */}
@@ -198,8 +335,8 @@ export default function Assessment() {
                 disabled={isLoading}
               />
               
-              {/* Show transcription if available */}
-              {transcription && (
+              {/* Show transcription if available and setting enabled */}
+              {transcription && voiceSettings.showTranscriptionWhileRecording && (
                 <div className="mt-4">
                   <TranscriptionDisplay
                     transcription={transcription}
@@ -240,15 +377,23 @@ export default function Assessment() {
                 <span className="text-xs text-muted-foreground">
                   {currentResponse.length} / 2000 characters
                 </span>
-                {useTextMode && currentResponse.trim() && (
-                  <Button
-                    size="sm"
-                    onClick={handleTextResponse}
-                    disabled={isLoading}
-                  >
-                    Save Response
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {saveStatus === 'saving' && (
+                    <span className="text-xs text-muted-foreground">Saving...</span>
+                  )}
+                  {saveStatus === 'saved' && (
+                    <span className="text-xs text-accent">✓ Response saved</span>
+                  )}
+                  {useTextMode && currentResponse.trim() && (
+                    <Button
+                      size="sm"
+                      onClick={handleTextResponse}
+                      disabled={isLoading || saveStatus === 'saving'}
+                    >
+                      Save Response
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -278,23 +423,33 @@ export default function Assessment() {
 
           <Button
             onClick={handleNext}
-            disabled={isLoading}
+            disabled={isLoading || saveStatus === 'saving'}
             className="min-w-[100px]"
           >
-            {isLastQuestion ? (
+            {saveStatus === 'saving' ? (
+              'Saving...'
+            ) : isLastQuestion ? (
               <>
                 <CheckCircle size={16} className="mr-1" />
                 Complete
               </>
             ) : (
               <>
-                Next
+                {saveStatus === 'saved' ? 'Continue' : 'Save & Continue'}
                 <ChevronRight size={16} className="ml-1" />
               </>
             )}
           </Button>
         </div>
       </div>
+
+      {/* Voice Settings Modal */}
+      <VoiceSettings
+        settings={voiceSettings}
+        onSettingsChange={setVoiceSettings}
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 }
