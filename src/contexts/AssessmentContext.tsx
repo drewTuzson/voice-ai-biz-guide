@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { assessmentQuestions, AssessmentQuestion } from '@/data/questions';
 import { useToast } from '@/hooks/use-toast';
+import { aiService } from '@/services/ai.service';
 
 interface AssessmentResponse {
   id: string;
@@ -40,9 +41,12 @@ interface AssessmentContextType {
   skipQuestion: () => Promise<void>;
   completeAssessment: () => Promise<void>;
   loadAssessment: (assessmentId: string) => Promise<void>;
+  analyzeResponse: (questionId: string, response: string) => Promise<string | null>;
   
   // State
   isLoading: boolean;
+  isAnalyzing: boolean;
+  aiResponses: Record<string, string>;
   error: string | null;
   canGoNext: boolean;
   canGoPrevious: boolean;
@@ -60,6 +64,8 @@ export function AssessmentProvider({ children }: { children: React.ReactNode }) 
   const [responses, setResponses] = useState<AssessmentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiResponses, setAiResponses] = useState<Record<string, string>>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const currentQuestion = assessmentQuestions[currentQuestionIndex] || null;
   const canGoNext = currentQuestionIndex < assessmentQuestions.length - 1;
@@ -273,6 +279,38 @@ export function AssessmentProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
+  const analyzeResponse = useCallback(async (questionId: string, responseText: string) => {
+    setIsAnalyzing(true);
+    try {
+      const conversationHistory = responses
+        .filter(r => !!r.response_text)
+        .map(r => {
+          const q = assessmentQuestions.find(q => q.id === r.question_id);
+          return `Q: ${q?.text ?? r.question_id}\nA: ${r.response_text ?? ''}`;
+        })
+        .join('\n\n');
+
+      const currentQuestionText = assessmentQuestions.find(q => q.id === questionId)?.text ?? questionId;
+
+      const result = await aiService.analyzeResponse({
+        currentQuestion: currentQuestionText,
+        userResponse: responseText,
+        conversationHistory,
+      });
+
+      const aiText: string = result?.response ?? '';
+      if (aiText) {
+        setAiResponses(prev => ({ ...prev, [questionId]: aiText }));
+      }
+      return aiText || null;
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      return null;
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [responses]);
+
   const value: AssessmentContextType = {
     currentAssessment,
     currentQuestion,
@@ -285,7 +323,10 @@ export function AssessmentProvider({ children }: { children: React.ReactNode }) 
     skipQuestion,
     completeAssessment,
     loadAssessment,
+    analyzeResponse,
     isLoading,
+    isAnalyzing,
+    aiResponses,
     error,
     canGoNext,
     canGoPrevious,

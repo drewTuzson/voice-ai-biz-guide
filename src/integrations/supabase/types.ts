@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       assessment_responses: {
         Row: {
+          ai_analysis: string | null
+          ai_follow_up: string | null
           assessment_id: string | null
           created_at: string | null
           id: string
@@ -25,6 +27,8 @@ export type Database = {
           response_type: string | null
         }
         Insert: {
+          ai_analysis?: string | null
+          ai_follow_up?: string | null
           assessment_id?: string | null
           created_at?: string | null
           id?: string
@@ -34,6 +38,8 @@ export type Database = {
           response_type?: string | null
         }
         Update: {
+          ai_analysis?: string | null
+          ai_follow_up?: string | null
           assessment_id?: string | null
           created_at?: string | null
           id?: string
@@ -111,6 +117,41 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      reports: {
+        Row: {
+          assessment_id: string | null
+          created_at: string | null
+          id: string
+          report_data: Json
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          assessment_id?: string | null
+          created_at?: string | null
+          id?: string
+          report_data: Json
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          assessment_id?: string | null
+          created_at?: string | null
+          id?: string
+          report_data?: Json
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

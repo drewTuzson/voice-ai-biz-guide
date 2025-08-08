@@ -9,6 +9,7 @@ import { TranscriptionDisplay } from '@/components/Voice/TranscriptionDisplay';
 import { ResponseDisplay } from '@/components/Assessment/ResponseDisplay';
 import { VoiceSettings } from '@/components/Assessment/VoiceSettings';
 import { AlexMessage } from '@/components/Assessment/AlexMessage';
+import { AlexResponse } from '@/components/Assessment/AlexResponse';
 import { useAssessment } from '@/contexts/AssessmentContext';
 import { alexVoice } from '@/utils/textToSpeech';
 import { ChevronLeft, ChevronRight, SkipForward, CheckCircle, Volume2, VolumeX, RotateCcw, Settings, Play } from 'lucide-react';
@@ -35,7 +36,9 @@ export default function Assessment() {
     error,
     canGoNext,
     canGoPrevious,
-    progress
+    progress,
+    analyzeResponse,
+    isAnalyzing
   } = useAssessment();
 
   const [currentResponse, setCurrentResponse] = useState('');
@@ -53,6 +56,8 @@ export default function Assessment() {
     autoAdvance: false,
     showTranscriptionWhileRecording: true
   });
+  const [showAiResponse, setShowAiResponse] = useState(false);
+  const [currentAiResponse, setCurrentAiResponse] = useState('');
 
   // Load assessment or start new one
   useEffect(() => {
@@ -100,7 +105,12 @@ export default function Assessment() {
     setHasRecordedAudio(true);
     // Auto-save the response with audio
     if (currentQuestion) {
-      saveResponse(currentQuestion.id, transcription || currentResponse, audioBlob);
+      const text = transcription || currentResponse;
+      saveResponse(currentQuestion.id, text, audioBlob);
+      setShowAiResponse(true);
+      analyzeResponse(currentQuestion.id, text).then((res) => {
+        if (res) setCurrentAiResponse(res);
+      });
     }
   };
 
@@ -348,6 +358,11 @@ export default function Assessment() {
           )}
         </div>
       </Card>
+
+      {/* Alex AI Response */}
+      {showAiResponse && (
+        <AlexResponse response={currentAiResponse} isLoading={isAnalyzing} />
+      )}
 
       {/* Navigation */}
       <div className="flex items-center justify-between">
